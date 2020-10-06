@@ -1,0 +1,334 @@
+openapi: 3.0.1
+info:
+  version: 0.0.1
+  title: Consent mediator api
+# during dev, should point to your local machine
+servers:
+  - url: https://localhost:10010/v2
+  - url: http://localhost:10010/v2
+paths:
+  /consent:
+    x-swagger-router-controller: consent
+    get:
+      tags:
+        - getConsent
+      summary: Request for consent
+      description: Returns a consent by customer
+      parameters:
+      - name: customerId
+        description: Customer id i.e. ssn
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ssn'
+      - name: processId
+        description: The initiating process id such as the benefit application case id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      - name: includeMeta
+        description: Reimbursement report date range
+        in: query
+        schema:
+          type: boolean
+          default: true
+      responses:
+        200:
+          description: Consent data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentData'
+        default:
+          description: Error getting consent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - addConsent
+      summary: Adds a consent for a customer (internally adds a customer account if needed)
+      description: Adds a new consent to a customer. Can be a nested consent
+      requestBody:
+        description: Consent data
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentCreationRequest'
+      responses:
+        200:
+          description: Consent data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentData'
+        default:
+          description: Error adding consent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+        - updateConsent
+      summary: Modify single consent in consent data
+      requestBody:
+        description: Consent data
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentUpdateRequest'
+      responses:
+        200:
+          description: Consent data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentUpdateResponse'
+        default:
+          description: Error modifying consent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /revoke:
+    post:
+      tags:
+      - revoke
+      summary: Revokes a consent
+      description: Revokes the consent as a group or a single consent within the group of consents if targetConsentId is given in request.
+      requestBody:
+        description: Consent data
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokationRequest'
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokationResponse'
+  /swagger:
+    x-swagger-pipe: swagger_raw
+  /consents:
+    x-swagger-router-controller: consents
+    get:
+      tags:
+        - consents
+      summary: Request for consent
+      description: Returns a consent by customer
+      parameters:
+      - name: customerId
+        description: The customer whose consents
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ssn'
+      responses:
+        200:
+          description: All consents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsentData'
+components:
+  schemas:
+    ConsentCreationRequest:
+      required:
+      - consent
+      - origin
+      properties:
+        consent:
+          $ref: '#/components/schemas/ConsentData'
+        origin:
+          $ref: '#/components/schemas/ConsentOrigin'
+    ConsentUpdateRequest:
+      properties:
+        consentId:
+          $ref: '#/components/schemas/Identifier'
+        reason:
+          type: string
+    ConsentUpdateResponse:
+      properties:
+        modifiedConsent:
+          $ref: '#/components/schemas/Consent'
+        modificationTime:
+          $ref: '#/components/schemas/DateTime'
+    RevokationRequest:
+      required:
+      - customerId
+      - processId
+      properties:
+        customerId:
+          $ref: '#/components/schemas/Ssn'
+        processId:
+          $ref: '#/components/schemas/Identifier'
+        targetConsentId:
+          $ref: '#/components/schemas/Identifier'
+        reason:
+          type: string
+    RevokationResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        consentId:
+          type: string
+          format: uuid
+        result:
+          type: boolean
+    ConsentData:
+      type: object
+      required:
+      - processId
+      - consent
+      - personalId
+      properties:
+        processId:
+          $ref: '#/components/schemas/Identifier'
+        consent:
+          $ref: '#/components/schemas/Consent'
+        metainfo:
+          $ref: '#/components/schemas/ConsentMeta'
+        personalId:
+          $ref: '#/components/schemas/Ssn'
+    ConsentMeta:
+      type: object
+      required:
+      - origin
+      - creator
+      properties:
+        origin:
+          type: string
+          enum:
+          - benefitApplication
+          - webApp
+          - mobileClient
+          - phoneConversation
+          - office
+          - print
+        creator:
+          $ref: '#/components/schemas/ConsentHandler'
+        modifier:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentHandler'
+        created:
+          $ref: '#/components/schemas/DateTime'
+    Consent:
+      type: object
+      required:
+      - id
+      - reason
+      - text
+      - target
+      properties:
+        id: 
+          $ref: '#/components/schemas/Identifier'
+        reason:
+          type: string
+        description:
+          type: string
+        text:
+          type: string
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentTarget'
+    ConsentTarget:
+      type: object
+      properties:
+        targetId:
+          $ref: '#/components/schemas/Identifier'
+        name:
+          type: string
+        targetType:
+          type: string
+          enum:
+          - documentExchange
+          - conversation
+          - dataInquiry
+          - automaticProcessing
+    ErrorResponse:
+      #errorCode tai message pakollinen
+      required:
+      - status
+      - errorCodes
+      - message
+      properties:
+        status:
+          type: integer
+        errorCodes:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+        #can be replaced by error code
+        decisionActive:
+          type: boolean
+    CreateAccountResponse:
+      required:
+        - accountId
+      properties:
+        status:
+          type: string
+        accountId:
+          type: string
+    ConsentHandler:
+      type: object
+      required: 
+        - id
+      properties:
+        id:
+          description: either personal ssn or tax id o
+          type: string
+        name:
+          type: string
+        creatorType:
+          type: string
+          enum:
+          - self
+          - publicOfficial
+          - healthcare
+          - employer
+    ConsentOrigin:
+      type: string
+      enum:
+      - benefitApplication
+      - webApp
+      - mobileClient
+      - phoneConversation
+      - office
+      - print
+    Ssn:
+      type: string
+      pattern: '^\d{6}[A-]\d{3}[a-zA-Z0-9]$'
+    BusinessId:
+      type: string
+      pattern: '/^[\d]{7}-[\d]$'
+    Identifier:
+      type: string
+      format: uuid
+    DateRange:
+      type: object
+      required:
+      - startDate
+      - endDate
+      properties:
+        startDate:
+          $ref: '#/components/schemas/Date'
+        endDate:
+          $ref: '#/components/schemas/Date'
+    Date: 
+      type: string
+      format: date
+    DateTime: 
+      type: string
+      format: datetime
