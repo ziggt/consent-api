@@ -1,260 +1,293 @@
 openapi: 3.0.1
 info:
   version: 0.0.1
-  title: Consent mediator api
+  title: Smart Money api
 # during dev, should point to your local machine
+#host: localhost:10010
+# basePath prefixes all resource paths 
+#basePath: /
 servers:
   - url: https://localhost:10010/v2
   - url: http://localhost:10010/v2
+#schemes:
+# tip: remove http to make production-grade
+#  - http
+#  - https
+# format of bodies a client can send (Content-Type)
+# format of the responses to the client (Accepts)
 paths:
-  /consent:
-    x-swagger-router-controller: consent
+  /reimburse:
+      x-swagger-router-controller: reimburse
+      post:
+        operationId: reimburse
+        tags:
+        - reimburse
+        description: Request reimbursement
+        # used as the method name of the controller
+        requestBody:
+          required: true
+          description: Parties involved with the decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReimbursementRequest'
+        responses:
+          200:
+            description: OK
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ReimbursementResponse'
+          # responses may fall through to errors
+          default:
+            description: Error
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ErrorResponse'
+  /reimbursementStatus:
+    x-swagger-router-controller: reimburse
     get:
       tags:
-        - getConsent
-      summary: Request for consent
-      description: Returns a consent by customer
+        - reimbursementStatus
+      summary: Request for report the result of reimbursement
+      description: Returns a report of reimbursements of each requested user account
       parameters:
-      - name: customerId
-        description: Customer id i.e. ssn
-        in: query
-        required: true
+      - name: therapists
+        in: query 
+        description: Therapists with reimbursement requests
+        explode: true
+        style: form
         schema:
-          $ref: '#/components/schemas/Ssn'
-      - name: processId
-        description: The initiating process id such as the benefit application case id
-        in: query
-        required: true
+          type: array
+          items:
+            $ref: '#/components/schemas/Ssn'
+      - name: clients
+        in: query 
+        description: Clients in reimbursement requests
+        explode: true
+        style: form
         schema:
-          $ref: '#/components/schemas/Identifier'
-      - name: includeMeta
+          type: array
+          items:
+            $ref: '#/components/schemas/Ssn'
+      - name: dateRange
         description: Reimbursement report date range
         in: query
-        schema:
-          type: boolean
-          default: true
-      responses:
-        200:
-          description: Consent data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConsentData'
-        default:
-          description: Error getting consent
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    post:
-      tags:
-        - addConsent
-      summary: Adds a consent for a customer (internally adds a customer account if needed)
-      description: Adds a new consent to a customer. Can be a nested consent
-      requestBody:
-        description: Consent data
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConsentCreationRequest'
-      responses:
-        200:
-          description: Consent data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConsentData'
-        default:
-          description: Error adding consent
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    patch:
-      tags:
-        - updateConsent
-      summary: Modify single consent in consent data
-      requestBody:
-        description: Consent data
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConsentUpdateRequest'
-      responses:
-        200:
-          description: Consent data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConsentUpdateResponse'
-        default:
-          description: Error modifying consent
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /revoke:
-    post:
-      tags:
-      - revoke
-      summary: Revokes a consent
-      description: Revokes the consent as a group or a single consent within the group of consents if targetConsentId is given in request.
-      requestBody:
-        description: Consent data
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RevokationRequest'
-      responses:
-        200:
-          description: Ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RevokationResponse'
-  /swagger:
-    x-swagger-pipe: swagger_raw
-  /consents:
-    x-swagger-router-controller: consents
-    get:
-      tags:
-        - consents
-      summary: Request for consent
-      description: Returns a consent by customer
-      parameters:
-      - name: customerId
-        description: The customer whose consents
-        in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Ssn'
+          $ref: '#/components/schemas/DateRange'
       responses:
         200:
-          description: All consents
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReimbursementStatusResponse'
+        # responses may fall through to errors
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /decision:
+    # binds a127 app logic to a route
+    x-swagger-router-controller: decision
+    get:
+      operationId: decision
+      description: Returns decision information
+      # used as the method name of the controller
+      parameters:
+      - in: query
+        name: parties
+        description: Parties involved with the decision
+        schema:
+          type: object
+          required:
+            - clientId
+            - therapistId
+          properties:
+            clientId:
+              $ref: '#/components/schemas/Ssn'
+            therapistId:
+              $ref: '#/components/schemas/Ssn'
+            dateTime:
+              $ref: '#/components/schemas/DateTime'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+              # returns status 200, with empty content if not found
+                $ref: '#/components/schemas/TherapyDecision'
+        # responses may fall through to errors
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /decisions:
+    # binds a127 app logic to a route
+    x-swagger-router-controller: decision
+    get:
+      operationId: decisions
+      description: Returns decision information
+      # used as the method name of the controller
+      parameters:
+      - in: query
+        name: parties
+        description: Parties involved with the decision
+        schema:
+          type: object
+          anyOf:
+            - required: [clientId]
+            - required: [therapistId]
+          properties:
+            clientId:
+              type: string
+            therapistId:
+              type: string
+            activeOnly: 
+              type: boolean
+              default: true
+            dateRange:
+              $ref: '#/components/schemas/DateRange'
+          additionalProperties: false
+      responses:
+        200:
+          description: Success
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ConsentData'
+                  $ref: '#/components/schemas/TherapyDecision'
+        # responses may fall through to errors
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /account:
+    x-swagger-router-controller: account
+    get:
+      operationId: account
+      description: create a new account
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAccountResponse'
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /account/{accountId}:
+    x-swagger-router-controller: account
+    get:
+      operationId: balance
+      summary: retrieve account balance
+      parameters:
+      - in: path
+        name: accountId
+        description: Account identifier
+        required: true
+        schema:
+          $ref: '#/components/schemas/Identifier'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountData'
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /swagger:
+    x-swagger-pipe: swagger_raw
 components:
   schemas:
-    ConsentCreationRequest:
-      required:
-      - consent
-      - origin
-      properties:
-        consent:
-          $ref: '#/components/schemas/ConsentData'
-        origin:
-          $ref: '#/components/schemas/ConsentOrigin'
-    ConsentUpdateRequest:
-      properties:
-        consentId:
-          $ref: '#/components/schemas/Identifier'
-        reason:
-          type: string
-    ConsentUpdateResponse:
-      properties:
-        modifiedConsent:
-          $ref: '#/components/schemas/Consent'
-        modificationTime:
-          $ref: '#/components/schemas/DateTime'
-    RevokationRequest:
-      required:
-      - customerId
-      - processId
-      properties:
-        customerId:
-          $ref: '#/components/schemas/Ssn'
-        processId:
-          $ref: '#/components/schemas/Identifier'
-        targetConsentId:
-          $ref: '#/components/schemas/Identifier'
-        reason:
-          type: string
-    RevokationResponse:
-      type: object
-      properties:
-        status:
-          type: integer
-        consentId:
-          type: string
-          format: uuid
-        result:
-          type: boolean
-    ConsentData:
+    AccountData:
       type: object
       required:
-      - processId
-      - consent
-      - personalId
+        - balance
+        - tokenType
+        - tokenValue
       properties:
-        processId:
-          $ref: '#/components/schemas/Identifier'
-        consent:
-          $ref: '#/components/schemas/Consent'
-        metainfo:
-          $ref: '#/components/schemas/ConsentMeta'
+        balance:
+          type: number
+          format: integer
+          multipleOf: 1
+        tokenType:
+          type: string
+        # additional info to prestudy
+        tokenValue:
+          type: number
+          format: double
+          multipleOf: 0.01
         personalId:
           $ref: '#/components/schemas/Ssn'
-    ConsentMeta:
-      type: object
-      required:
-      - origin
-      - creator
-      properties:
-        origin:
-          type: string
-          enum:
-          - benefitApplication
-          - webApp
-          - mobileClient
-          - phoneConversation
-          - office
-          - print
-        creator:
-          $ref: '#/components/schemas/ConsentHandler'
-        modifier:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConsentHandler'
         created:
           $ref: '#/components/schemas/DateTime'
-    Consent:
+    ReimbursementRequest:
       type: object
       required:
-      - id
-      - reason
-      - text
-      - target
+        - dateRange
       properties:
-        id: 
-          $ref: '#/components/schemas/Identifier'
-        reason:
-          type: string
-        description:
-          type: string
-        text:
-          type: string
-        targets:
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+        therapists:
           type: array
           items:
-            $ref: '#/components/schemas/ConsentTarget'
-    ConsentTarget:
+            $ref: '#/components/schemas/TherapistListItem'
+    ReimbursementResponse:
       type: object
       properties:
-        targetId:
-          $ref: '#/components/schemas/Identifier'
-        name:
+        #optional info, warning or error
+        message:
           type: string
-        targetType:
+        returnCode:
           type: string
-          enum:
-          - documentExchange
-          - conversation
-          - dataInquiry
-          - automaticProcessing
+        count:
+          type: integer
+        failCount:
+          type: integer
+    ReimbursementStatusResponse:
+      type: object
+      required:
+      - amount
+      - therapists
+      properties:
+        message:
+          type: string
+        # total count of successful reimbursements
+        count:
+          type: integer
+        # total requested amount in euros
+        amount:
+          type: integer
+        # total count of payments under dispute resolution
+        disputedPaymentCount:
+          type: integer
+        # total amount under disputes in euros
+        disputedAmount:
+          type: integer
+        therapists:
+          type: array
+          items:
+            $ref: '#/components/schemas/TherapistListItem'
     ErrorResponse:
       #errorCode tai message pakollinen
       required:
@@ -281,38 +314,106 @@ components:
           type: string
         accountId:
           type: string
-    ConsentHandler:
+    TherapyDecision:
       type: object
-      required: 
-        - id
+      required:
+      - therapistId
+      - clientId
+      - decisionId
+      - therapySessionsAvailable
       properties:
         id:
-          description: either personal ssn or tax id o
           type: string
+        therapistId:
+          type: object
+        clientId:
+          type: string
+        therapySessionsAvailable:
+          type: integer
+        therapyType: 
+          type: string
+        active:
+          type: boolean
+        validTime:
+          $ref: '#/components/schemas/DateRange'
+    TherapySession:
+      type: object
+      properties:
+        decisionId:
+          type: string
+        hours:
+          type: integer
+          minimum: 1
+          maximum: 2
+        status:
+          type: string
+          enum: [initial, reserved, paymentRequested, settled, disputed]
+        therapyType: string
+        enum: [A, B, C]
+        start:
+          $ref: '#/components/schemas/DateTime'
+    Therapist:
+      type: object
+      required:
+      - personalId
+      - name
+      - businessId
+      - hourRate
+      properties:
+        personalId:
+          $ref: '#/components/schemas/Ssn'
         name:
           type: string
-        creatorType:
+        businessId:
+          $ref: '#/components/schemas/BusinessId'
+        agency:
+          $ref: '#/components/schemas/Agency'
+        hourRate:
+          type: number
+          format: double
+          multipleOf: 0.01
+    TherapistListItem:
+      type: object
+      properties:
+        terapist:
+          $ref: '#/components/schemas/Therapist'
+        clients:
+          type: array
+          items:
+            $ref: '#/components/schemas/TherapyClientListItem'
+    TherapyClient:
+      type: object
+      required:
+      - personalId
+      properties:
+        personalId:
+          $ref: '#/components/schemas/Ssn'
+        name:
           type: string
-          enum:
-          - self
-          - publicOfficial
-          - healthcare
-          - employer
-    ConsentOrigin:
-      type: string
-      enum:
-      - benefitApplication
-      - webApp
-      - mobileClient
-      - phoneConversation
-      - office
-      - print
+    TherapyClientListItem:
+      type: object
+      required:
+      - client
+      properties:
+        client:
+          $ref: '#/components/schemas/TherapyClient'
+        therapySessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TherapySession'
+    Agency:
+      type: object
+      properties:
+        name:
+          type: string
+        businessId:
+          $ref: '#/components/schemas/BusinessId'
     Ssn:
       type: string
       pattern: '^\d{6}[A-]\d{3}[a-zA-Z0-9]$'
     BusinessId:
       type: string
-      pattern: '/^[\d]{7}-[\d]$'
+      pattern: '^[0-9]{7}\\-[0-9]{1}'
     Identifier:
       type: string
       format: uuid
