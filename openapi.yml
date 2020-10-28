@@ -8,15 +8,15 @@ servers:
   - url: http://localhost:10010/v2
 paths:
   /consent:
-    x-swagger-router-controller: consent
     get:
+      operationId: getConsent
       tags:
         - getConsent
       summary: Request for consent
       description: Returns a consent by customer
       parameters:
       - name: customerId
-        description: Customer id i.e. ssn
+        description: Customer id, temporarily ssn
         in: query
         required: true
         schema:
@@ -28,7 +28,7 @@ paths:
         schema:
           $ref: '#/components/schemas/Identifier'
       - name: includeMeta
-        description: Reimbursement report date range
+        description: Indicates whether to include additional metadata
         in: query
         schema:
           type: boolean
@@ -47,6 +47,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     post:
+      operationId: addConsent
       tags:
         - addConsent
       summary: Adds a consent for a customer (internally adds a customer account if needed)
@@ -71,6 +72,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     patch:
+      operationId: updateConsent
       tags:
         - updateConsent
       summary: Modify single consent in consent data
@@ -97,6 +99,7 @@ paths:
     post:
       tags:
       - revoke
+      operationId: revoke
       summary: Revokes a consent
       description: Revokes the consent as a group or a single consent within the group of consents if targetConsentId is given in request.
       requestBody:
@@ -112,13 +115,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RevokationResponse'
-  /swagger:
-    x-swagger-pipe: swagger_raw
   /consents:
-    x-swagger-router-controller: consents
     get:
+      operationId: getConsents
       tags:
-        - consents
+        - getConsents
       summary: Request for consent
       description: Returns a consent by customer
       parameters:
