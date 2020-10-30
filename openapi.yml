@@ -297,6 +297,9 @@ components:
             $ref: '#/components/schemas/ConsentTarget'
     ConsentTarget:
       type: object
+      required:
+      - name
+      - targetType
       properties:
         id:
           $ref: '#/components/schemas/Identifier'
@@ -304,6 +307,7 @@ components:
           type: string
         active:
           type: boolean
+          default: true
         targetType:
           type: string
           enum:
@@ -313,11 +317,11 @@ components:
           - automaticProcessing
     ErrorResponse:
       type: object
-      #errorCode tai message pakollinen
-      required:
-      - status
+      anyOf:
       - errorCodes
       - message
+      required:
+      - status
       properties:
         status:
           type: integer
@@ -327,9 +331,6 @@ components:
             type: string
         message:
           type: string
-        #can be replaced by error code
-        decisionActive:
-          type: boolean
     ConsentHandler:
       type: object
       anyOf:
@@ -337,7 +338,7 @@ components:
       - required: [name, businessId]
       required: 
       - id
-      - creatorType
+      - handlerType
       properties:
         id:
           description: either account id, personal ssn
@@ -346,7 +347,7 @@ components:
           $ref: '#/components/schemas/BusinessId'
         name:
           type: string
-        creatorType:
+        handlerType:
           type: string
           enum:
           - customer
