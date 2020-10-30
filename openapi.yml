@@ -13,7 +13,7 @@ paths:
       tags:
         - getConsent
       summary: Request for consent
-      description: Returns a consent by customer
+      description: Returns a consent by customer and processId i.e. decisionId
       parameters:
       - name: customerId
         description: Customer id, temporarily ssn
@@ -28,7 +28,7 @@ paths:
         schema:
           $ref: '#/components/schemas/Identifier'
       - name: includeMeta
-        description: Indicates whether to include additional metadata
+        description: Indicates whether to include additional metadata in response
         in: query
         schema:
           type: boolean
@@ -124,7 +124,13 @@ paths:
       description: Returns a consent by customer
       parameters:
       - name: customerId
-        description: The customer whose consents
+        description: The customer whose consents are returned, temporarily ssn
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ssn'
+      - name: context
+        description: Context code or name, i.e. rehabilitation
         in: query
         required: true
         schema:
@@ -141,39 +147,69 @@ paths:
 components:
   schemas:
     ConsentCreationRequest:
+      type: object
       required:
-      - consent
+      - creator
+      - consentData
       - origin
+      - context
       properties:
         consent:
           $ref: '#/components/schemas/ConsentData'
         origin:
           $ref: '#/components/schemas/ConsentOrigin'
+        context: #Code value of the consent context, such as benefit type
+          type: string
+        creator:
+          $ref: '#/components/schemas/ConsentHandler'
     ConsentUpdateRequest:
+      type: object
+      anyOf:
+      - required: [reason]
+      - required: [dateRange]
+      required:
+      - consentId
+      - reason
       properties:
         consentId:
           $ref: '#/components/schemas/Identifier'
         reason:
           type: string
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsentTarget'
+        modifier:
+          $ref: '#/components/schemas/ConsentHandler'
     ConsentUpdateResponse:
+      type: object
       properties:
         modifiedConsent:
           $ref: '#/components/schemas/Consent'
         modificationTime:
           $ref: '#/components/schemas/DateTime'
     RevokationRequest:
+      type: object
+      anyOf:
+      - required: [processId]
+      - required: [targetConsentIds]
       required:
-      - customerId
-      - processId
+      - revoker
       properties:
         customerId:
           $ref: '#/components/schemas/Ssn'
         processId:
           $ref: '#/components/schemas/Identifier'
-        targetConsentId:
-          $ref: '#/components/schemas/Identifier'
+        targetConsentIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Identifier'
         reason:
           type: string
+        revoker:
+          $ref: '#/components/schemas/ConsentHandler'
     RevokationResponse:
       type: object
       properties:
@@ -188,14 +224,17 @@ components:
       type: object
       required:
       - processId
-      - consent
+      - consents
       - personalId
+      - metadata
       properties:
         processId:
           $ref: '#/components/schemas/Identifier'
-        consent:
-          $ref: '#/components/schemas/Consent'
-        metainfo:
+        consents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Consent'
+        metadata:
           $ref: '#/components/schemas/ConsentMeta'
         personalId:
           $ref: '#/components/schemas/Ssn'
@@ -204,6 +243,7 @@ components:
       required:
       - origin
       - creator
+      - context
       properties:
         origin:
           type: string
@@ -214,6 +254,8 @@ components:
           - phoneConversation
           - office
           - print
+        context: #Code value of the consent context, such as benefit type
+          type: string
         creator:
           $ref: '#/components/schemas/ConsentHandler'
         modifier:
@@ -228,12 +270,23 @@ components:
       - id
       - reason
       - text
-      - target
+      - dateRange
+      - targets
       properties:
         id: 
           $ref: '#/components/schemas/Identifier'
         reason:
           type: string
+        previousReasons:
+          type: array
+          items:
+            type: string
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+        previousReasonsDateRanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/DateRange'
         description:
           type: string
         text:
@@ -245,10 +298,12 @@ components:
     ConsentTarget:
       type: object
       properties:
-        targetId:
+        id:
           $ref: '#/components/schemas/Identifier'
         name:
           type: string
+        active:
+          type: boolean
         targetType:
           type: string
           enum:
@@ -257,6 +312,7 @@ components:
           - dataInquiry
           - automaticProcessing
     ErrorResponse:
+      type: object
       #errorCode tai message pakollinen
       required:
       - status
@@ -274,31 +330,30 @@ components:
         #can be replaced by error code
         decisionActive:
           type: boolean
-    CreateAccountResponse:
-      required:
-        - accountId
-      properties:
-        status:
-          type: string
-        accountId:
-          type: string
     ConsentHandler:
       type: object
+      anyOf:
+      - required: [id] # forces both name and businessId for service prodiver users or neither for customer
+      - required: [name, businessId]
       required: 
-        - id
+      - id
+      - creatorType
       properties:
         id:
-          description: either personal ssn or tax id o
+          description: either account id, personal ssn
           type: string
+        businessId:
+          $ref: '#/components/schemas/BusinessId'
         name:
           type: string
         creatorType:
           type: string
           enum:
-          - self
+          - customer
+          - benefitHandler
           - publicOfficial
+          - privateOfficial
           - healthcare
-          - employer
     ConsentOrigin:
       type: string
       enum:
